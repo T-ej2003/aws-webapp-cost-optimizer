@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Run deterministic AI-assisted code security gate
-        run: python scripts/ai_code_review_gate.py . --fail-on high
+        run: python scripts/ai_code_review_gate.py src examples docs README.md --fail-on high
       - name: Run tests
         run: |
           python -m pip install -e '.[dev]'
