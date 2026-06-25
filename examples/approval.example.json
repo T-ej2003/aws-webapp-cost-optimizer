@@ -1,0 +1,9 @@
+{
+  "approver": "security@example.com",
+  "ticket": "COST-123",
+  "approved_resource_ids": [
+    "eipalloc-exampleidle"
+  ],
+  "expires_at": null,
+  "signature": null
+}
