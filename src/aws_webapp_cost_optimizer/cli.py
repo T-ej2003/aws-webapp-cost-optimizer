@@ -10,6 +10,7 @@ from typing import Any
 from .analyzers import analyze_inventory
 from .aws_collectors import AwsInventoryCollector, sample_inventory
 from .evidence import create_evidence_dir, load_inventory, read_json, write_json, write_sha256_manifest
+from .policy import generate_change_plan, load_approval_record, write_change_plan
 from .report import write_markdown_report
 
 
@@ -27,6 +28,15 @@ def main(argv: list[str] | None = None) -> int:
     report_parser = subparsers.add_parser("report", help="Render Markdown report for an evidence directory")
     report_parser.add_argument("--evidence-dir", required=True)
 
+    plan_parser = subparsers.add_parser("plan", help="Create a no-mutation, approval-gated change plan")
+    plan_parser.add_argument("--evidence-dir", required=True)
+    plan_parser.add_argument("--approval-record", help="Optional JSON approval record")
+    plan_parser.add_argument(
+        "--approval-hmac-secret-env",
+        default=None,
+        help="Optional environment variable containing HMAC key required to validate approval signature",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "inventory":
         return _inventory(args)
@@ -34,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         return _analyze(args)
     if args.command == "report":
         return _report(args)
+    if args.command == "plan":
+        return _plan(args)
     parser.error("unknown command")
     return 2
 
@@ -82,6 +94,24 @@ def _report(args: argparse.Namespace) -> int:
     write_markdown_report(evidence_dir / "report.md", analysis)
     write_sha256_manifest(evidence_dir)
     print(evidence_dir / "report.md")
+    return 0
+
+
+def _plan(args: argparse.Namespace) -> int:
+    evidence_dir = Path(args.evidence_dir)
+    analysis_path = evidence_dir / "analysis.json"
+    analysis = read_json(analysis_path) if analysis_path.exists() else analyze_inventory(load_inventory(evidence_dir))
+    if not analysis_path.exists():
+        write_json(analysis_path, analysis)
+    approval_record = load_approval_record(Path(args.approval_record)) if args.approval_record else None
+    plan = generate_change_plan(
+        analysis,
+        approval_record=approval_record,
+        approval_secret_env=args.approval_hmac_secret_env,
+    )
+    write_change_plan(evidence_dir / "change-plan.json", plan)
+    write_sha256_manifest(evidence_dir)
+    print(evidence_dir / "change-plan.json")
     return 0
 
 
